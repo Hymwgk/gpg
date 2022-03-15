@@ -110,6 +110,14 @@ public:
   std::vector<GraspSet> searchHands(const CloudCamera& cloud_cam, bool plots_normals = false,
     bool plots_samples = false) const;
 
+
+
+  Eigen::Matrix3Xd getHandPoints(const Eigen::Vector3d bottom_center,
+    const Eigen::Vector3d approach,const Eigen::Vector3d binormal)
+  {
+
+  }
+
   /**
    * \brief Reevaluate a list of grasp candidates.
    * \param cloud_cam the point cloud

@@ -12,6 +12,7 @@ PointList::PointList(int size, int num_cams)
 
 PointList PointList::slice(const std::vector<int>& indices) const
 {
+  //对点云进行索引，抽取子集
   Eigen::Matrix3Xd points_out = EigenUtils::sliceMatrix(points_, indices);
   Eigen::Matrix3Xd normals_out = EigenUtils::sliceMatrix(normals_, indices);
   Eigen::MatrixXi cam_source_out = EigenUtils::sliceMatrix(cam_source_, indices);

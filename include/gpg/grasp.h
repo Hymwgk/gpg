@@ -48,7 +48,7 @@
 // custom
 #include <gpg/finger_hand.h>
 
-
+//参数化一个抓取
 struct GraspPose
 {
   Eigen::Vector3d surface_; ///< the centered grasp position on the object surface

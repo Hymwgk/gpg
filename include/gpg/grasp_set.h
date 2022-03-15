@@ -182,6 +182,16 @@ class GraspSet
     {
       return hands_;
     }
+    /**
+     * \brief 返回该grasp set所对应的夹爪内部的子点云.
+     * \return 返回该grasp set所对应的夹爪内部的子点云.
+     */
+    const std::vector<PointList>& getInnerPoints() const
+    {
+      return inner_points_;
+    }
+
+
 
     /**
      * \brief Set the grasps for this grasp set.
@@ -296,6 +306,7 @@ class GraspSet
 
     Eigen::Vector3d sample_; ///< the center of the point neighborhood
     std::vector<Grasp> hands_; ///< the grasps contained in this grasp set
+    std::vector<PointList> inner_points_;///候选抓取姿态下，夹爪内部的点
     Eigen::Array<bool, 1, Eigen::Dynamic> is_valid_; ///< indicates for each grasp if it is valid or not
     Eigen::VectorXd angles_; ///< the hand orientations to consider in the local search
 

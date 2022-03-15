@@ -55,6 +55,7 @@ std::vector<GraspSet> HandSearch::searchHands(const CloudCamera& cloud_cam, bool
   }
 
   // 1. Estimate local reference frames.
+  //第一步在目标点云中采样得到指定数量的局部坐标系
   std::cout << "Estimating local reference frames ...\n";
   std::vector<LocalFrame> frames;
   FrameEstimator frame_estimator(params_.num_threads_);
@@ -75,6 +76,7 @@ std::vector<GraspSet> HandSearch::searchHands(const CloudCamera& cloud_cam, bool
 
   // 2. Evaluate possible hand placements.
   std::cout << "Finding hand poses ...\n";
+  //针对找到的系列局部坐标系，来估计一些可能的抓取
   std::vector<GraspSet> hypothesis_set_list = evaluateHands(cloud_cam, frames, kdtree);
 
   std::cout << "====> HAND SEARCH TIME: " << omp_get_wtime() - t0_total << std::endl;
@@ -112,9 +114,9 @@ std::vector<Grasp> HandSearch::reevaluateHypotheses(const CloudCamera& cloud_cam
   PointList nn_points;
   std::vector<int> labels(grasps.size()); // -1: not feasible, 0: feasible, >0: see Antipodal class
 
-#ifdef _OPENMP // parallelization using OpenMP
-#pragma omp parallel for private(nn_indices, nn_dists, nn_points) num_threads(params_.num_threads_)
-#endif
+  #ifdef _OPENMP // parallelization using OpenMP
+  #pragma omp parallel for private(nn_indices, nn_dists, nn_points) num_threads(params_.num_threads_)
+  #endif
   for (int i = 0; i < grasps.size(); i++)
   {
     labels[i] = 0;
@@ -187,11 +189,12 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
   PointList nn_points;
   GraspSet::HandGeometry hand_geom(params_.finger_width_, params_.hand_outer_diameter_, params_.hand_depth_,
     params_.hand_height_, params_.init_bite_);
-//  GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
+  //  GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
 
-#ifdef _OPENMP // parallelization using OpenMP
-#pragma omp parallel for private(nn_indices, nn_dists, nn_points) num_threads(params_.num_threads_)
-#endif
+  #ifdef _OPENMP // parallelization using OpenMP
+  #pragma omp parallel for private(nn_indices, nn_dists, nn_points) num_threads(params_.num_threads_)
+  #endif
+  //针对单个局部坐标系，计算候选抓取，并评估
   for (std::size_t i = 0; i < frames.size(); i++)
   {
     pcl::PointXYZRGBA sample = eigenVectorToPcl(frames[i].getSample());
@@ -199,9 +202,11 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
     if (kdtree.radiusSearch(sample, nn_radius_, nn_indices, nn_dists) > 0)
     {
       nn_points = point_list.slice(nn_indices);
+      //在这里对点云进行了平移，变成以局部坐标系为中心
       nn_points.setPoints(nn_points.getPoints() - frames[i].getSample().replicate(1, nn_points.size()));
-
+      //根据旋转参数，初始化一些抓取配置
       GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
+      //然后对这些局部坐标系进行评估，在hand_set内部就会针对frames[i]计算出一个候选抓取集合
       hand_set.evaluateHypotheses(nn_points, frames[i]);
 
       if (hand_set.getIsValid().any()) // at least one feasible hand

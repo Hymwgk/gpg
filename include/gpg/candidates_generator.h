@@ -78,6 +78,16 @@ class CandidatesGenerator
       std::vector<double> workspace_; ///< the robot's workspace
     };
 
+
+    /**
+     * 候选抓取列表以及它们夹爪内部对应的点云列表
+     */
+    struct GraspsWithPoints
+    {
+      std::vector<Grasp> candidates;
+      std::vector<Eigen::Matrix3Xd> inner_points;
+    };
+
     /**
      * \brief Constructor.
      * \param params the parameters to be used for the candidate generation
@@ -105,6 +115,14 @@ class CandidatesGenerator
      * \return list of grasp candidates
      */
     std::vector<Grasp> generateGraspCandidates(const CloudCamera& cloud_cam);
+
+    /**
+     * \brief 给定一个点云，生成候选抓取并计算夹爪内部点云.
+     * \param cloud_cam the point cloud
+     * \return 候选抓取列表以及内部点云列表
+     */
+    CandidatesGenerator::GraspsWithPoints generateGraspCandidatesWithInnerPoints(const CloudCamera& cloud_cam);
+
 
     /**
      * \brief Generate grasp candidate sets given a point cloud.

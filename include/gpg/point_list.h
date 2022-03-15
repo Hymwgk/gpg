@@ -77,14 +77,14 @@ class PointList
     PointList(int size, int num_cams);
 
     /**
-     * \brief Slice the point list given a set of indices.
+     * \brief Slice the point list given a set of indices.利用给定的索引，对点云抽选子集
      * \param indices the indices to be sliced
      * \return the point list containing the points given by the indices
      */
     PointList slice(const std::vector<int>& indices) const;
 
     /**
-     * \brief Transform a point list to a robot hand frame.
+     * \brief Transform a point list to a robot hand frame.对点云进行旋转
      * \param centroid the origin of the frame
      * \param rotation the orientation of the frame (3 x 3 rotation matrix)
      * \return the point list transformed into the hand frame
@@ -92,7 +92,7 @@ class PointList
     PointList transformToHandFrame(const Eigen::Vector3d& centroid, const Eigen::Matrix3d& rotation) const;
 
     /**
-     * \brief Rotate a point list.
+     * \brief Rotate a point list.仅仅对点云进行旋转，不进行平移
      * \param rotation the 3 x 3 rotation matrix
      * \return the rotated point list
      */

@@ -9,12 +9,20 @@ FingerHand::FingerHand(double finger_width, double hand_outer_diameter,	double h
 
 	// Calculate the finger spacing.
 	Eigen::VectorXd fs_half;
+  //生成一个长度为n的向量，元素值在0~(hand_outer_diameter - finger_width)之间均匀分布
 	fs_half.setLinSpaced(n, 0.0, hand_outer_diameter - finger_width);
 	finger_spacing_.resize(2 * n);
+  //内部值范围变成了2n份，从-(hand_outer_diameter - finger_width)~(hand_outer_diameter - finger_width)
 	finger_spacing_	<< (fs_half.array() - hand_outer_diameter + finger_width_).matrix(), fs_half;
 
 	fingers_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, 2 * n, false);
 	hand_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, n, false);
+
+  //根据给定的夹爪参数，计算虚拟夹爪每个角点的局部坐标
+  
+
+
+
 }
 
 
@@ -158,15 +166,19 @@ std::vector<int> FingerHand::computePointsInClosingRegion(const Eigen::Matrix3Xd
   }
 
   // Calculate the lateral parameters of the hand closing region for this finger placement.
+  //对夹爪在binormal轴偏移到给定的位置
   left_ = finger_spacing_(idx) + finger_width_;
   right_ = finger_spacing_(hand_.cols() + idx);
   center_ = 0.5 * (left_ + right_);
   surface_ = points.row(lateral_axis_).minCoeff();
 
   // Find points inside the hand closing region defined by <bottom_>, <top_>, <left_> and <right_>.
+  //
   std::vector<int> indices;
   for (int i = 0; i < points.cols(); i++)
   {
+    //由于输入的点云已经是切片好的，因此，只需要判断
+    //某点是否在binormal和approach轴的方向，处于夹爪内部即可
     if (points(forward_axis_, i) > bottom_ && points(forward_axis_, i) < top_
         && points(lateral_axis_, i) > left_ && points(lateral_axis_, i) < right_)
     {

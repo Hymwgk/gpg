@@ -293,6 +293,8 @@ class FingerHand
     double finger_width_; ///< the width of the robot hand fingers
     double hand_depth_; ///< the hand depth (finger length)
 
+
+    Eigen::Matrix3Xd hand_points_;///虚拟夹爪各个角的坐标，共21个点，第一个点是bottom center
     Eigen::VectorXd finger_spacing_; ///< the possible finger placements
     Eigen::Array<bool, 1, Eigen::Dynamic> fingers_; ///< indicates the feasible fingers
     Eigen::Array<bool, 1, Eigen::Dynamic> hand_;///< indicates the feasible 2-finger placements

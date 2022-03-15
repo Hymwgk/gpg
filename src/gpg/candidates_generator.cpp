@@ -12,16 +12,18 @@ CandidatesGenerator::CandidatesGenerator(const Parameters& params,
 
 void CandidatesGenerator::preprocessPointCloud(CloudCamera& cloud_cam)
 {
-//  const double VOXEL_SIZE = 0.002;
+//  const double VOXEL_SIZE = 0.002;均匀采样
   const double VOXEL_SIZE = 0.003;
 
   std::cout << "Processing cloud with: " << cloud_cam.getCloudOriginal()->size() << " points.\n";
 
   // Calculate surface normals using integral images if possible.
+  /*
   if (cloud_cam.getCloudOriginal()->isOrganized() && cloud_cam.getNormals().cols() == 0)
   {
     cloud_cam.calculateNormals(0);
   }
+  */
 
   // perform statistical outlier removal
   if (params_.remove_statistical_outliers_)
@@ -61,7 +63,7 @@ void CandidatesGenerator::preprocessPointCloud(CloudCamera& cloud_cam)
     // 3. Subsampling
     if (cloud_cam.getSamples().cols() > 0)
     {
-      // 4. Calculate surface normals.
+      // 4. Calculate surface normals.计算表面法向量
       if (cloud_cam.getNormals().cols() == 0)
       {
         cloud_cam.calculateNormals(params_.num_threads_);
@@ -121,13 +123,16 @@ void CandidatesGenerator::preprocessPointCloud(CloudCamera& cloud_cam)
 std::vector<Grasp> CandidatesGenerator::generateGraspCandidates(const CloudCamera& cloud_cam)
 {
   // Find sets of grasp candidates.
+  //如果设配置参数num_samples=n，那么计算查找出m<=n个抓取集合对象
+  //每个抓取局部坐标系检测出0或1个集合
   std::vector<GraspSet> hand_set_list = hand_search_->searchHands(cloud_cam);
   std::cout << "Generated " << hand_set_list.size() << " grasp candidate sets.\n";
 
-  // Extract the grasp candidates.
+  // Extract the grasp candidates.把这些抓取从抓取集合类对象中抽取出来，组成一个大vector
   std::vector<Grasp> candidates;
   for (int i = 0; i < hand_set_list.size(); i++)
   {
+    //得到第i个抓取集合里面的 候选抓取
     const std::vector<Grasp>& hands = hand_set_list[i].getHypotheses();
 
     for (int j = 0; j < hands.size(); j++)
@@ -148,6 +153,46 @@ std::vector<Grasp> CandidatesGenerator::generateGraspCandidates(const CloudCamer
   }
 
   return candidates;
+}
+
+CandidatesGenerator::GraspsWithPoints CandidatesGenerator::generateGraspCandidatesWithInnerPoints(const CloudCamera& cloud_cam)
+{
+  // Find sets of grasp candidates.
+  //如果设配置参数num_samples=n，那么计算查找出m<=n个抓取集合对象
+  //每个抓取局部坐标系检测出0或1个集合
+  std::vector<GraspSet> hand_set_list = hand_search_->searchHands(cloud_cam);
+  std::cout << "Generated " << hand_set_list.size() << " grasp candidate sets.\n";
+
+  // Extract the grasp candidates.把这些抓取从抓取集合类对象中抽取出来，组成一个大vector
+  GraspsWithPoints grasps_with_points;
+  //std::vector<Grasp> candidates;
+  //std::vector<Eigen::Matrix3Xd> inner_points;
+  for (int i = 0; i < hand_set_list.size(); i++)
+  {
+    //得到第i个抓取集合里面的 候选抓取
+    const std::vector<Grasp>& hands = hand_set_list[i].getHypotheses();
+    //得到第i个抓取集合里面的 候选抓取 对应的夹爪内部点云
+    const std::vector<PointList>& hand_inner_points = hand_set_list[i].getInnerPoints();
+
+    for (int j = 0; j < hands.size(); j++)
+    {
+      if (hand_set_list[i].getIsValid()(j))
+      {
+        grasps_with_points.candidates.push_back(hands[j]);
+        grasps_with_points.inner_points.push_back(hand_inner_points[j].getPoints());
+      }
+    }
+  }
+  std::cout << "Generated " << grasps_with_points.candidates.size() << " grasp candidates.\n";
+
+  if (params_.plot_grasps_)
+  {
+    const HandSearch::Parameters& params = hand_search_->getParams();
+    plotter_.plotFingers3D(grasps_with_points.candidates, cloud_cam.getCloudOriginal(), "Grasp Candidates", params.hand_outer_diameter_,
+      params.finger_width_, params.hand_depth_, params.hand_height_);
+  }
+
+  return grasps_with_points;
 }
 
 

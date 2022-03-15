@@ -9,6 +9,9 @@ CloudCamera::CloudCamera()
   sample_indices_.resize(0);
   samples_.resize(3,0);
   normals_.resize(3,0);
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
+
 }
 
 
@@ -22,6 +25,32 @@ CloudCamera::CloudCamera(const PointCloudRGB::Ptr& cloud, const Eigen::MatrixXi&
 
   pcl::copyPointCloud(*cloud, *cloud_original_);
   *cloud_processed_ = *cloud_original_;
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
+
+}
+
+CloudCamera::CloudCamera(const PointCloudRGB::Ptr& cloud, const Eigen::MatrixXi& camera_source,
+  const Eigen::Matrix3Xd& view_points,const Eigen::Matrix4d& table_pose) : cloud_processed_(new PointCloudRGB), cloud_original_(new PointCloudRGB),
+    camera_source_(camera_source), view_points_(view_points),table_pose_(table_pose)
+{
+  sample_indices_.resize(0);
+  samples_.resize(3,0);
+  normals_.resize(3,0);
+
+  pcl::copyPointCloud(*cloud, *cloud_original_);
+  *cloud_processed_ = *cloud_original_;
+  
+  if(table_pose_.array().abs().sum()>0)
+  { 
+    has_table=true;
+  }
+  else
+  {
+    has_table=false;
+    //table_pose_=Eigen::Matrix4d::Random();
+  }
+
 }
 
 
@@ -35,6 +64,9 @@ CloudCamera::CloudCamera(const PointCloudPointNormal::Ptr& cloud, const Eigen::M
 
   pcl::copyPointCloud(*cloud, *cloud_original_);
   *cloud_processed_ = *cloud_original_;
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
+
 }
 
 
@@ -43,6 +75,8 @@ CloudCamera::CloudCamera(const PointCloudPointNormal::Ptr& cloud, int size_left_
 {
   sample_indices_.resize(0);
   samples_.resize(3,0);
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
 
   pcl::copyPointCloud(*cloud, *cloud_original_);
   *cloud_processed_ = *cloud_original_;
@@ -74,6 +108,8 @@ CloudCamera::CloudCamera(const PointCloudRGB::Ptr& cloud, int size_left_cloud, c
   sample_indices_.resize(0);
   samples_.resize(3,0);
   normals_.resize(3,0);
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
 
   // set the camera source matrix: (i,j) = 1 if point j is seen by camera i
   if (size_left_cloud == 0) // one camera
@@ -96,6 +132,9 @@ CloudCamera::CloudCamera(const std::string& filename, const Eigen::Matrix3Xd& vi
   sample_indices_.resize(0);
   samples_.resize(3,0);
   normals_.resize(3,0);
+  has_table=false;
+  table_pose_=Eigen::Matrix4d::Random();
+
   cloud_processed_ = loadPointCloudFromFile(filename);
   cloud_original_ = cloud_processed_;
   camera_source_ = Eigen::MatrixXi::Ones(1, cloud_processed_->size());
@@ -107,9 +146,11 @@ CloudCamera::CloudCamera(const std::string& filename_left, const std::string& fi
   const Eigen::Matrix3Xd& view_points)
 : cloud_processed_(new PointCloudRGB), cloud_original_(new PointCloudRGB), view_points_(view_points)
 {
+  has_table=false;
   sample_indices_.resize(0);
   samples_.resize(3,0);
   normals_.resize(3,0);
+  table_pose_=Eigen::Matrix4d::Random();
 
   // load and combine the two point clouds
   std::cout << "Loading point clouds ...\n";

@@ -37,7 +37,7 @@
 #include <iostream>
 #include <vector>
 
-
+using namespace Eigen;
 /** FingerHand class
  *
  * \brief Calculate collision-free finger placements.
@@ -61,8 +61,9 @@ class FingerHand
      * \param finger_width the width of the fingers
      * \param hand_outer_diameter the maximum aperture of the robot hand
      * \param hand_depth the length of the fingers
+     * \param hand_height the height of the fingers
      */
-    FingerHand(double finger_width, double hand_outer_diameter, double hand_depth);
+    FingerHand(double finger_width, double hand_outer_diameter, double hand_depth,double hand_height);
 
     /**
      * \brief Find possible finger placements.
@@ -92,11 +93,26 @@ class FingerHand
      * \return the points that are located in the closing region
      */
     std::vector<int> computePointsInClosingRegion(const Eigen::Matrix3Xd& points, int idx = -1);
+    
+    /**
+     * \brief  计算机械手在某个位姿下，各个角点的坐标值.
+     * \param bottom_center 夹爪底部中心点
+     * \param approach 机械手的接近轴
+     * \return 
+     */
+    Eigen::Matrix3Xd getHandPoints(const Eigen::Vector3d &bottom_center,
+      const Eigen::Vector3d &approach,const Eigen::Vector3d &binormal);
+    
 
     /**
      * \brief Check which 2-finger placements are feasible.
      */
     void evaluateHand();
+
+    /**
+     * \brief 检查夹爪是否会与桌面碰撞
+     */
+    void collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame);
 
     /**
      * \brief Check the 2-finger placement at a given index.
@@ -292,6 +308,8 @@ class FingerHand
 
     double finger_width_; ///< the width of the robot hand fingers
     double hand_depth_; ///< the hand depth (finger length)
+    double hand_height_;
+    double hand_outer_diameter_;
 
 
     Eigen::Matrix3Xd hand_points_;///虚拟夹爪各个角的坐标，共21个点，第一个点是bottom center

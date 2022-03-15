@@ -166,6 +166,12 @@ class GraspSet
      * \param local_frame the local reference frame
      */
     void evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame);
+    /**
+     * \brief Calculate a grasp set given a local reference frame.带有桌面
+     * \param point_list the point neighborhood
+     * \param local_frame the local reference frame
+     */
+    void evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local);
 
     /**
      * \brief Calculate the set of shadow points for a grasp set.

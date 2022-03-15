@@ -31,6 +31,100 @@ GraspSet::GraspSet(const HandGeometry& hand_geometry, const Eigen::VectorXd& ang
   inner_points_.resize(0);
 }
 
+void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local)
+//对单个局部坐标系进行评估
+{
+  hands_.resize(angles_.size());
+  inner_points_.resize(angles_.size());
+
+  sample_ = local_frame.getSample();
+  is_valid_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, angles_.size(), false);
+  //
+  FingerHand finger_hand(hand_geometry_.finger_width_, hand_geometry_.outer_diameter_, hand_geometry_.depth_,hand_geometry_.height_);
+  Eigen::Matrix3d rot_binormal;
+
+  // Set the lateral and forward axis of the robot hand frame (closing direction and grasp approach direction).
+  if (rotation_axis_ == ROTATION_AXIS_CURVATURE_AXIS)
+  {
+    finger_hand.setLateralAxis(1);
+    finger_hand.setForwardAxis(0);
+
+    // Rotation about binormal by 180 degrees (reverses direction of normal)
+    rot_binormal <<  -1.0,  0.0,  0.0,
+      0.0,  1.0,  0.0,
+      0.0,  0.0, -1.0;
+  }
+
+  // Local reference frame 之前得到的一个虚拟典范夹爪坐标系
+  Eigen::Matrix3d local_frame_mat;
+  local_frame_mat << local_frame.getNormal(), local_frame.getBinormal(), local_frame.getCurvatureAxis();
+
+  // Evaluate grasp at each hand orientation.
+  //每个抓取局部坐标系都有几个旋转值，每个旋转值对应一个候选抓取
+  for (int i = 0; i < angles_.rows(); i++)
+  {
+    // Rotation about curvature axis by <angles_(i)> radians
+    Eigen::Matrix3d rot;
+    rot <<  cos(angles_(i)),  -1.0 * sin(angles_(i)),   0.0,
+      sin(angles_(i)),  cos(angles_(i)),          0.0,
+      0.0,              0.0,                      1.0;
+
+    // Rotate points into this hand orientation. 把点云按照夹爪姿态旋转到局部坐标系中
+    Eigen::Matrix3d frame_rot;
+    frame_rot.noalias() = local_frame_mat * rot_binormal * rot;
+    //仅仅对点云进行旋转，不平移，因为之前已经平移过了
+    PointList point_list_frame = point_list.rotatePointList(frame_rot.transpose());
+    //对桌面坐标系进行旋转
+    Eigen::Matrix4d table_pose_frame = table_pose_local;
+    table_pose_frame.block(0,0,3,3) = frame_rot.transpose()*table_pose_frame.block(0,0,3,3);//姿态部分
+    table_pose_frame.block(0,3,3,1) = frame_rot.transpose()*table_pose_frame.block(0,3,3,1);//位置部分
+
+
+    // Crop points on hand height.将点云切片，只要夹爪高度区域内部的一块点云
+    PointList point_list_cropped = point_list_frame.cropByHandHeight(hand_geometry_.height_);
+
+    // Evaluate finger placements for this orientation.评估在binormal轴向不同的偏移量下，
+    //评估左右手指是否与点云接触
+    finger_hand.evaluateFingers(point_list_cropped.getPoints(), hand_geometry_.init_bite_);
+
+    // Check that there is at least one feasible 2-finger placement.
+    //如果某个偏移量下，对应的夹爪左右指都没有碰撞，就说明当前偏移量下，夹爪可行
+    //评价出至少存在1个发生碰撞的抓取偏移量
+    finger_hand.evaluateHand();
+    //检查夹爪是否与桌面碰撞
+    finger_hand.collisionCheckHandTable(table_pose_frame);
+
+
+    if (finger_hand.getHand().any())
+    {
+      // Try to move the hand as deep as possible onto the object.尽可能使夹爪更加靠近物体点云表面
+      int finger_idx = finger_hand.deepenHand(point_list_cropped.getPoints(), hand_geometry_.init_bite_, hand_geometry_.depth_);
+
+      // Calculate points in the closing region of the hand.如果夹爪内部没有点，就舍弃该抓取姿态
+      std::vector<int> indices_closing = finger_hand.computePointsInClosingRegion(point_list_cropped.getPoints(), finger_idx);
+      //夹爪内部至少要有一个点
+      if (indices_closing.size() == 0)
+      {
+        continue;
+      }
+      //把夹爪内部的点抽取出来
+      PointList points_in_closing_region=point_list_cropped.slice(indices_closing);
+
+      // create the grasp hypothesis针对该旋转angle创建一个候选抓取配置
+      Grasp hand = createHypothesis(local_frame.getSample(), point_list_cropped, indices_closing, frame_rot,
+        finger_hand);
+      //将夹爪各个点旋转到桌面坐标系下
+
+
+      //把当前候选抓取配置存起来
+      hands_[i] = hand;
+      is_valid_[i] = true;
+      //在这里把截取的点云区域存下来
+      inner_points_[i]=points_in_closing_region;
+
+    }
+  }
+}
 
 void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame)
 //对单个局部坐标系进行评估
@@ -41,7 +135,7 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
   sample_ = local_frame.getSample();
   is_valid_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, angles_.size(), false);
   //
-  FingerHand finger_hand(hand_geometry_.finger_width_, hand_geometry_.outer_diameter_, hand_geometry_.depth_);
+  FingerHand finger_hand(hand_geometry_.finger_width_, hand_geometry_.outer_diameter_, hand_geometry_.depth_,hand_geometry_.height_);
   Eigen::Matrix3d rot_binormal;
 
   // Set the lateral and forward axis of the robot hand frame (closing direction and grasp approach direction).
@@ -106,7 +200,7 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
       // create the grasp hypothesis针对该旋转angle创建一个候选抓取配置
       Grasp hand = createHypothesis(local_frame.getSample(), point_list_cropped, indices_closing, frame_rot,
         finger_hand);
-      //读取出夹爪内部区域点坐标
+      //将夹爪各个点旋转到桌面坐标系下
 
 
       //把当前候选抓取配置存起来

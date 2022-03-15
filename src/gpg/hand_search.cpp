@@ -127,7 +127,7 @@ std::vector<Grasp> HandSearch::reevaluateHypotheses(const CloudCamera& cloud_cam
       nn_points = point_list.slice(nn_indices);
       nn_points.setPoints(nn_points.getPoints() - grasps[i].getSample().replicate(1, nn_points.size()));
       PointList nn_points_frame;
-      FingerHand finger_hand(params_.finger_width_, params_.hand_outer_diameter_, params_.hand_depth_);
+      FingerHand finger_hand(params_.finger_width_, params_.hand_outer_diameter_, params_.hand_depth_,params_.hand_height_);
 
       // set the lateral and forward axes of the robot hand frame (closing direction and grasp approach direction)
       if (params_.rotation_axis_ == ROTATION_AXIS_CURVATURE_AXIS)
@@ -187,6 +187,11 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
   std::vector<GraspSet> hand_set_list(frames.size());
   PointList point_list(points, cloud_cam.getNormals(), cloud_cam.getCameraSource(), cloud_cam.getViewPoints());
   PointList nn_points;
+  Eigen::Matrix4d table_pose;
+  if(cloud_cam.has_table)
+  {
+    table_pose = cloud_cam.getTablePose();
+  }
   GraspSet::HandGeometry hand_geom(params_.finger_width_, params_.hand_outer_diameter_, params_.hand_depth_,
     params_.hand_height_, params_.init_bite_);
   //  GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
@@ -204,10 +209,27 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
       nn_points = point_list.slice(nn_indices);
       //在这里对点云进行了平移，变成以局部坐标系为中心
       nn_points.setPoints(nn_points.getPoints() - frames[i].getSample().replicate(1, nn_points.size()));
+      //对桌面坐标系也进行平移
+      Eigen::Matrix4d table_pose_local;
+      if(cloud_cam.has_table)
+      {
+        Eigen::MatrixXd temp(4,1);
+        temp << frames[i].getSample()[0],frames[i].getSample()[1],frames[i].getSample()[2],1.0;
+        table_pose_local = table_pose;
+        table_pose_local.block(0,3,3,1) -= temp.block(0,0,3,1);
+      }
       //根据旋转参数，初始化一些抓取配置
       GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
       //然后对这些局部坐标系进行评估，在hand_set内部就会针对frames[i]计算出一个候选抓取集合
-      hand_set.evaluateHypotheses(nn_points, frames[i]);
+      if(cloud_cam.has_table)
+      {
+        hand_set.evaluateHypotheses(nn_points, frames[i],table_pose_local);
+      }
+      else{
+        hand_set.evaluateHypotheses(nn_points, frames[i]);
+      }
+      //
+
 
       if (hand_set.getIsValid().any()) // at least one feasible hand
       {

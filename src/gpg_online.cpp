@@ -59,6 +59,7 @@ class GPG_ONLINE
     //夹爪物理参数
     HandSearch::Parameters hand_search_params;
     std::vector<double> camera_pose;
+    std::vector<double> table_pose;
 
   GPG_ONLINE(std::string config_path):config_file(config_path)
   {
@@ -80,8 +81,10 @@ class GPG_ONLINE
     bool remove_outliers = config_file.getValueOfKey<bool>("remove_outliers", false);
     std::string workspace_str = config_file.getValueOfKeyAsString("workspace", "");
     std::string camera_pose_str = config_file.getValueOfKeyAsString("camera_pose", "");
+    std::string table_pose_str = config_file.getValueOfKeyAsString("table_pose", "");
     std::vector<double> workspace = stringToDouble(workspace_str);
     camera_pose = stringToDouble(camera_pose_str);
+    table_pose=stringToDouble(table_pose_str);
     std::cout << "voxelize: " << voxelize << "\n";
     std::cout << "remove_outliers: " << remove_outliers << "\n";
     std::cout << "workspace: " << workspace_str << "\n";
@@ -139,13 +142,18 @@ class GPG_ONLINE
   {
     Eigen::Matrix3Xd view_points(3,1);
     view_points << camera_pose[3], camera_pose[6], camera_pose[9];
+    //得到桌面标签坐标系
+    Eigen::VectorXd table_pose_v;
+    table_pose_v<<table_pose[0],table_pose[1],table_pose[2],table_pose[3],
+      table_pose[4],table_pose[5],table_pose[6],table_pose[7],table_pose[8];
+    Eigen::Matrix4d table_pose_m = Eigen::Map<Eigen::Matrix4d>(table_pose_v.data()).transpose();
 
     PointCloudRGB::Ptr cloud(new PointCloudRGB());
 		//把kinect点云数据转化为pcl::PointXYZRGBA
 		pcl::fromROSMsg	(*cloud_msg,*cloud);
     camera_source = Eigen::MatrixXi::Ones(1, cloud->size());
     //(点云+相机)整体对象
-    CloudCamera cloud_cam(cloud,camera_source,view_points);
+    CloudCamera cloud_cam(cloud,camera_source,view_points,table_pose_m);
     if (cloud_cam.getCloudOriginal()->size() == 0)
     {
       ROS_WARN("Input point cloud is empty or does not exist!\n");
@@ -154,7 +162,7 @@ class GPG_ONLINE
     candidates_generator->preprocessPointCloud(cloud_cam);
 
     //进行采样得到系列候选抓取 以及它们夹爪内部区域的点云集合
-    CandidatesGenerator::GraspsWithPoints grasps_with_points= \
+    CandidatesGenerator::GraspsWithPoints grasps_with_points= 
             candidates_generator->generateGraspCandidatesWithInnerPoints(cloud_cam);
 
   }

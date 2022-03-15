@@ -71,6 +71,11 @@ class CloudCamera
 public:
 
   /**
+   * \brief 标志是否存在桌子坐标系
+  */
+  bool has_table;
+
+  /**
    * \brief Comparator for checking uniqueness of two 3D-vectors.
   */
   struct UniqueVectorComparator
@@ -133,7 +138,15 @@ public:
    */
   CloudCamera(const PointCloudRGB::Ptr& cloud, const Eigen::MatrixXi& camera_source,
     const Eigen::Matrix3Xd& view_points);
-
+  /**
+   * \brief Constructor.
+   * \param cloud the point cloud (of size n)
+   * \param camera_source the camera source for each point in the cloud (size: k x n)
+   * \param view_points the origins of the cameras (size: 3 x k)
+   * \param table_pose 桌面平面坐标系（桌面标签坐标系）在相机坐标系下的位姿
+   */
+  CloudCamera(const PointCloudRGB::Ptr& cloud, const Eigen::MatrixXi& camera_source,
+    const Eigen::Matrix3Xd& view_points,const Eigen::Matrix4d& table_pose);
   /**
    * \brief Constructor.
    * \param cloud the point cloud with surface normals (of size n)
@@ -326,7 +339,14 @@ public:
   {
     return view_points_;
   }
-
+  /**
+   * \brief 获得桌面标签在相机坐标系下的位姿姿态
+   * \return 桌面标签在相机坐标系下的位姿姿态
+  */
+  const Eigen::Matrix4d& getTablePose() const
+  {
+    return table_pose_;
+  }
   /**
    * \brief Set the camera view points.
    * \return the origins of the cameras (size: 3 x k)
@@ -353,6 +373,7 @@ private:
   std::vector<int> sample_indices_; ///< the indices into the point cloud used to sample grasp hypotheses
   Eigen::Matrix3Xd samples_; ///< the samples used for finding grasp hypotheses
   Eigen::Matrix3Xd view_points_; ///< the viewpoints of the camera on the cloud
+  Eigen::Matrix4d table_pose_;  //桌面标签相对于相机的位姿
 };
 
 #endif /* CLOUD_CAMERA_H_ */

@@ -81,6 +81,8 @@ class Plot
      */
     void plotFingers3D(const std::vector<Grasp>& hand_list, const PointCloudRGBA::Ptr& cloud,
       std::string str, double outer_diameter, double finger_width, double hand_depth, double hand_height) const;
+    void plotFingers3D(Eigen::Matrix4d frame,const std::vector<Grasp>& hand_list, const PointCloudRGBA::Ptr& cloud,std::string str, 
+    double outer_diameter, double finger_width, double hand_depth, double hand_height) const;
 
     /**
      * \brief Plot a list of grasp sets.
@@ -147,6 +149,11 @@ class Plot
      * \param cloud the point cloud to be plotted
      */
     void plotLocalAxes(const std::vector<LocalFrame>& frame_list, const PointCloudRGBA::Ptr& cloud) const;
+
+
+    void plotFrameAxes(const Eigen::Matrix4d& frame, const PointCloudRGBA::Ptr& cloud) const;
+
+    void plotFrameAxes(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const;
 
     /**
      * \brief Plot the camera source for each point in the point cloud.

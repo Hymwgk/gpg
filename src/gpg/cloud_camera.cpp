@@ -171,6 +171,92 @@ CloudCamera::CloudCamera(const std::string& filename_left, const std::string& fi
   camera_source_.block(1,cloud_left->size(),1,cloud_right->size()) = Eigen::MatrixXi::Ones(1, cloud_right->size());
 }
 
+void CloudCamera::sampleAbovePlane() 
+{
+  double t0 = omp_get_wtime();
+  printf("Sampling above plane ...\n");
+  std::vector<int> indices(0);
+  pcl::SACSegmentation<pcl::PointXYZRGBA> seg;
+  pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+  pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+  seg.setInputCloud(cloud_processed_);
+  seg.setOptimizeCoefficients(true);
+  seg.setModelType(pcl::SACMODEL_PLANE);
+  seg.setMethodType(pcl::SAC_RANSAC);
+  seg.setDistanceThreshold(0.01);
+  //得到了桌面的参数
+  seg.segment(*inliers, *coefficients);
+  if (inliers->indices.size() > 0) {
+    pcl::ExtractIndices<pcl::PointXYZRGBA> extract;
+    extract.setInputCloud(cloud_processed_);
+    extract.setIndices(inliers);
+    extract.setNegative(true);
+    extract.filter(indices);
+  } 
+  
+
+
+
+
+
+  if (indices.size() > 0) {
+    sample_indices_ = indices;
+    printf(" Plane fit succeeded. %zu samples above plane.\n",
+           sample_indices_.size());
+    std::cout << "table coefficients: " << coefficients->values[0] << " " 
+                                          << coefficients->values[1] << " "
+                                          << coefficients->values[2] << " " 
+                                          << coefficients->values[3] << std::endl;
+    Eigen::Vector3d table_z_axis(double(coefficients->values[0]),double(coefficients->values[1]),double(coefficients->values[2]));
+    //调整桌面法相要与相机z轴夹角大于90度
+    if (coefficients->values[2]>0)
+    {
+      table_z_axis = -table_z_axis;
+    }
+    Eigen::Vector3d table_x_axis(-table_z_axis[1],table_z_axis[0],0.0);
+    Eigen::Vector3d table_y_axis;
+    table_y_axis = table_z_axis.cross(table_x_axis);
+    //相机z轴与桌面交点
+    Eigen::Vector3d table_o(0.0,0.0,double(-coefficients->values[3]/coefficients->values[2]));
+
+    Eigen::Matrix4d table_pose = Eigen::MatrixXd::Identity(4,4);
+    table_pose.block(0,0,3,1)=table_x_axis;
+    table_pose.block(0,1,3,1)=table_y_axis;
+    table_pose.block(0,2,3,1)=table_z_axis;
+    table_pose.block(0,3,3,1)=table_o;
+    if(!has_table)
+    {
+      has_table=true;
+      table_pose_=table_pose;
+    }
+    //plotter_.plotFrameAxes(table_pose,cloud_processed_);
+  } 
+  else {
+    printf(" Plane fit failed. Using entire point cloud ...\n");
+  }
+  
+  Eigen::MatrixXi camera_source(camera_source_.rows(), indices.size());
+  PointCloudRGB::Ptr cloud(new PointCloudRGB);
+  cloud->points.resize(indices.size());
+  for (int i = 0; i < indices.size(); i++)
+  {
+    camera_source.col(i) = camera_source_.col(indices[i]);
+    cloud->points[i] = cloud_processed_->points[indices[i]];
+  }
+  if (normals_.cols() > 0)
+  {
+    Eigen::Matrix3Xd normals(3, indices.size());
+    for (int i = 0; i < indices.size(); i++)
+    {
+      normals.col(i) = normals_.col(indices[i]);
+    }
+    normals_ = normals;
+  }
+  cloud_processed_ = cloud;
+  camera_source_ = camera_source;
+
+  std::cout << " runtime (plane fit): " << omp_get_wtime() - t0 << "\n";
+}
 
 void CloudCamera::filterWorkspace(const std::vector<double>& workspace)
 {

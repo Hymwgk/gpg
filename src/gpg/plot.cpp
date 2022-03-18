@@ -38,6 +38,35 @@ void Plot::plotFingers3D(const std::vector<Grasp>& hand_list, const PointCloudRG
   runViewer(viewer);
 }
 
+void Plot::plotFingers3D(Eigen::Matrix4d frame,const std::vector<Grasp>& hand_list, const PointCloudRGBA::Ptr& cloud,
+  std::string str, double outer_diameter, double finger_width, double hand_depth, double hand_height) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = createViewer(str);
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  for (int i = 0; i < hand_list.size(); i++)
+  {
+    plotHand3D(viewer, hand_list[i], outer_diameter, finger_width, hand_depth, hand_height, i);
+  }
+
+  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
+  viewer->addPointCloud<pcl::PointXYZRGBA>(cloud, rgb, "cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
+
+  runViewer(viewer);
+}
 
 
 void Plot::plotHand3D(boost::shared_ptr<pcl::visualization::PCLVisualizer>& viewer, const Grasp& hand,
@@ -47,11 +76,14 @@ void Plot::plotHand3D(boost::shared_ptr<pcl::visualization::PCLVisualizer>& view
   double base_depth = 0.02;
   double approach_depth = 0.07;
 
+  //left 为 binormal的负方向
   Eigen::Vector3d left_bottom = hand.getGraspBottom() - (hw - 0.5 * finger_width) * hand.getBinormal();
   Eigen::Vector3d right_bottom = hand.getGraspBottom() + (hw - 0.5 * finger_width) * hand.getBinormal();
   Eigen::VectorXd left_center = left_bottom + 0.5 * hand_depth * hand.getApproach();
   Eigen::VectorXd right_center = right_bottom + 0.5 * hand_depth * hand.getApproach();
+  //等价于base_center=hand.getGraspBottom()- 0.01 * hand.getApproach();
   Eigen::Vector3d base_center = left_bottom + 0.5 * (right_bottom - left_bottom) - 0.01 * hand.getApproach();
+  //这个没用
   Eigen::Vector3d approach_center = base_center - 0.04 * hand.getApproach();
 
   Eigen::Quaterniond quat(hand.getFrame());
@@ -61,7 +93,7 @@ void Plot::plotHand3D(boost::shared_ptr<pcl::visualization::PCLVisualizer>& view
   plotCube(viewer, left_center, quat, hand_depth, finger_width, hand_height, "left_finger_" + num);
   plotCube(viewer, right_center, quat, hand_depth, finger_width, hand_height, "right_finger_" + num);
   plotCube(viewer, base_center, quat, base_depth, outer_diameter, hand_height, "base_" + num);
-  plotCube(viewer, approach_center, quat, approach_depth, finger_width, 0.5*hand_height, "approach_" + num);
+  //plotCube(viewer, approach_center, quat, approach_depth, finger_width, 0.5*hand_height, "approach_" + num);
 }
 
 
@@ -400,6 +432,110 @@ void Plot::plotLocalAxes(const std::vector<LocalFrame>& quadric_list, const Poin
 }
 
 
+void Plot::plotFrameAxes(const Eigen::Matrix4d& frame, const PointCloudRGBA::Ptr& cloud) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = createViewer("Frame Axes");
+  viewer->addPointCloud<pcl::PointXYZRGBA>(cloud, "registered point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "registered point cloud");
+
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+
+  runViewer(viewer);
+}
+
+void Plot::plotFrameAxes(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = createViewer("Frame Axes");
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud(new pcl::PointCloud<pcl::PointXYZ> );
+  for (int i=0;i<points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = points(0,i);
+    temp.y = points(1,i);
+    temp.z = points(2,i);
+    cloud->push_back(temp);
+    }
+
+
+  viewer->addPointCloud<pcl::PointXYZ>(cloud, "registered point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "registered point cloud");
+
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+
+  runViewer(viewer);
+}
+
+
 void Plot::plotCameraSource(const Eigen::VectorXi& pts_cam_source_in, const PointCloudRGBA::Ptr& cloud) const
 {
   PointCloudRGBA::Ptr left_cloud(new PointCloudRGBA);
@@ -460,9 +596,9 @@ void Plot::runViewer(boost::shared_ptr<pcl::visualization::PCLVisualizer>& viewe
 boost::shared_ptr<pcl::visualization::PCLVisualizer> Plot::createViewer(std::string title) const
 {
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer(title));  
+  viewer->setBackgroundColor(0.0, 0.0, 0.0);
   viewer->setPosition(0, 0);
   viewer->setSize(640, 480);
-  viewer->setBackgroundColor(1.0, 1.0, 1.0);
 
   pcl::visualization::Camera camera;
   camera.clip[0] = 0.00130783;

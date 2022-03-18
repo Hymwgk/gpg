@@ -36,7 +36,7 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <vector>
-
+#include <pcl/visualization/pcl_visualizer.h>
 using namespace Eigen;
 /** FingerHand class
  *
@@ -100,7 +100,7 @@ class FingerHand
      * \param approach 机械手的接近轴
      * \return 
      */
-    Eigen::Matrix3Xd getHandPoints(const Eigen::Vector3d &bottom_center,
+    Eigen::MatrixXd getHandPoints(const Eigen::Vector3d &bottom_center,
       const Eigen::Vector3d &approach,const Eigen::Vector3d &binormal);
     
 
@@ -112,7 +112,12 @@ class FingerHand
     /**
      * \brief 检查夹爪是否会与桌面碰撞
      */
-    void collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame);
+    bool collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame);
+
+    bool collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame,
+      const Eigen::Matrix3Xd& partal_points,const Eigen::Matrix3Xd& origin_points);
+    void plotFramePlane(const Eigen::MatrixXd hand_points_collision,const Eigen::Matrix4d& frame, 
+        const Eigen::Matrix3Xd& partal_points,const Eigen::Matrix3Xd& origin_points) const;
 
     /**
      * \brief Check the 2-finger placement at a given index.
@@ -291,6 +296,7 @@ class FingerHand
       top_ = top;
     }
 
+    Eigen::Array<bool, 1, Eigen::Dynamic> hand_;///< indicates the feasible 2-finger placements
 
   private:
 
@@ -312,15 +318,14 @@ class FingerHand
     double hand_outer_diameter_;
 
 
-    Eigen::Matrix3Xd hand_points_;///虚拟夹爪各个角的坐标，共21个点，第一个点是bottom center
+    Eigen::MatrixXd hand_points_;///虚拟夹爪各个角的坐标，共21个点，第一个点是bottom center
     Eigen::VectorXd finger_spacing_; ///< the possible finger placements
     Eigen::Array<bool, 1, Eigen::Dynamic> fingers_; ///< indicates the feasible fingers
-    Eigen::Array<bool, 1, Eigen::Dynamic> hand_;///< indicates the feasible 2-finger placements
     double bottom_; ///< the base of the hand
     double top_; ///< the top of the hand, where the fingertips are
     double left_; ///< the left side of the gripper bounding box
-    double right_; ///< the right side of the gripper bounding box
-    double center_; ///< the horizontal center of the gripper bounding box
+    double right_; ///< the right side of the gripper bounding box  
+    double center_; ///< the horizontal center of the gripper bounding box 夹爪包围盒的水平长度的一半
     double surface_; ///< the corresponding vertical base point of the hand in the point cloud
 };
 

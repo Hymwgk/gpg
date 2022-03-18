@@ -61,11 +61,16 @@ void Grasp::calculateGraspPositions(const FingerHand& finger_hand)
   // calculate grasp positions of hand middle on object surface, bottom/base and top/fingertip w.r.t. base frame
   Eigen::Vector3d pos_top, pos_bottom, pos_surface;
   pos_surface << finger_hand.getSurface(), finger_hand.getCenter(), 0.0;
+  //计算bottomcenter相对于局部参考坐标系的位置（姿态不用管）
+  //getBottom() 夹爪bottomcenter 在局部坐标系的approach方向的位置
+  //
   pos_bottom << getBottom(), finger_hand.getCenter(), 0.0;
-  pos_top << getTop(), finger_hand.getCenter(), 0.0;
+  pos_top << getTop(), finger_hand.getCenter(), 0.0;//
   pose_.surface_ = getFrame() * pos_surface + sample_;
+  //将bottomcentre从相对于局部坐标系的位置，转换到相对于相机坐标系
+  //getFrame() 返回局部参考坐标系相对于相机坐标系中的姿态
   pose_.bottom_ = getFrame() * pos_bottom + sample_;
-  pose_.top_ = getFrame() * pos_top + sample_;
+  pose_.top_ = getFrame() * pos_top + sample_;  //两指尖连线中心点位置
 }
 
 

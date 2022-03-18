@@ -13,7 +13,7 @@
 #include <gpg/candidates_generator.h>
 #include <gpg/hand_search.h>
 #include <gpg/config_file.h>
-
+#include <gpg/plot.h>
 using namespace std;
 using namespace pcl;
 // function to read in a double array from a single line of a configuration file
@@ -79,6 +79,7 @@ class GPG_ONLINE
     //
     bool voxelize = config_file.getValueOfKey<bool>("voxelize", true);
     bool remove_outliers = config_file.getValueOfKey<bool>("remove_outliers", false);
+    bool remove_table = config_file.getValueOfKey<bool>("remove_table", false);
     std::string workspace_str = config_file.getValueOfKeyAsString("workspace", "");
     std::string camera_pose_str = config_file.getValueOfKeyAsString("camera_pose", "");
     std::string table_pose_str = config_file.getValueOfKeyAsString("table_pose", "");
@@ -87,6 +88,7 @@ class GPG_ONLINE
     table_pose=stringToDouble(table_pose_str);
     std::cout << "voxelize: " << voxelize << "\n";
     std::cout << "remove_outliers: " << remove_outliers << "\n";
+    std::cout << "remove_table: " << remove_table << "\n";
     std::cout << "workspace: " << workspace_str << "\n";
     std::cout << "camera_pose: " << camera_pose_str << "\n";
 
@@ -112,6 +114,8 @@ class GPG_ONLINE
     generator_params.plot_normals_ = plot_normals;
     generator_params.plot_grasps_ = plot_grasps;
     generator_params.remove_statistical_outliers_ = remove_outliers;
+    generator_params.remove_table_ = remove_table;
+
     generator_params.voxelize_ = voxelize;
     generator_params.workspace_ = workspace;
     //夹爪对象参数
@@ -133,7 +137,6 @@ class GPG_ONLINE
 
     // Create object to load point cloud from file.
     //CloudCamera cloud_cam(argv[2], view_points);
-
     //订阅kinect点云话题
     sub = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect2/qhd/points", 1, &GPG_ONLINE::gpg,this);
   }
@@ -143,9 +146,8 @@ class GPG_ONLINE
     Eigen::Matrix3Xd view_points(3,1);
     view_points << camera_pose[3], camera_pose[6], camera_pose[9];
     //得到桌面标签坐标系
-    Eigen::VectorXd table_pose_v;
-    table_pose_v<<table_pose[0],table_pose[1],table_pose[2],table_pose[3],
-      table_pose[4],table_pose[5],table_pose[6],table_pose[7],table_pose[8];
+    Eigen::Matrix<double, 1, 16>  table_pose_v(table_pose.data());
+
     Eigen::Matrix4d table_pose_m = Eigen::Map<Eigen::Matrix4d>(table_pose_v.data()).transpose();
 
     PointCloudRGB::Ptr cloud(new PointCloudRGB());
@@ -162,8 +164,8 @@ class GPG_ONLINE
     candidates_generator->preprocessPointCloud(cloud_cam);
 
     //进行采样得到系列候选抓取 以及它们夹爪内部区域的点云集合
-    CandidatesGenerator::GraspsWithPoints grasps_with_points= 
-            candidates_generator->generateGraspCandidatesWithInnerPoints(cloud_cam);
+    CandidatesGenerator::GraspsWithPoints grasps_with_points= candidates_generator->generateGraspCandidatesWithInnerPoints(cloud_cam);
+    //
 
   }
 

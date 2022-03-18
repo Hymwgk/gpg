@@ -49,8 +49,11 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/filters/extract_indices.h>
 
 #include <gpg/eigen_utils.h>
+//#include <gpg/plot.h>
 
 
 typedef pcl::PointCloud<pcl::PointXYZRGBA> PointCloudRGB;
@@ -193,7 +196,10 @@ public:
    * \param[in] workspace a 6-D vector containing the workspace limits: [minX, maxX, minY, maxY, minZ, maxZ]
   */
   void filterWorkspace(const std::vector<double>& workspace);
-
+  /**
+   * \brief 去除桌面点云
+  */
+  void sampleAbovePlane();
   /**
    * \brief Filter out samples that lie outside the workspace dimensions.
    * \param[in] workspace a 6-D vector containing the workspace limits: [minX, maxX, minY, maxY, minZ, maxZ]
@@ -374,6 +380,9 @@ private:
   Eigen::Matrix3Xd samples_; ///< the samples used for finding grasp hypotheses
   Eigen::Matrix3Xd view_points_; ///< the viewpoints of the camera on the cloud
   Eigen::Matrix4d table_pose_;  //桌面标签相对于相机的位姿
+
+  //Plot plotter_; ///< pointer to an object for plotting
+
 };
 
 #endif /* CLOUD_CAMERA_H_ */

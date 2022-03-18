@@ -31,12 +31,278 @@ GraspSet::GraspSet(const HandGeometry& hand_geometry, const Eigen::VectorXd& ang
   inner_points_.resize(0);
 }
 
-void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local)
+void GraspSet::plotFrameAxes(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Frame Axes"));  
+  viewer->setBackgroundColor(0.0, 0.0, 0.0);
+  viewer->setPosition(0, 0);
+  viewer->setSize(640, 480);
+
+  pcl::visualization::Camera camera;
+  camera.clip[0] = 0.00130783;
+  camera.clip[1] = 1.30783;
+  camera.focal[0] = 0.776838;
+  camera.focal[1] = -0.095644;
+  camera.focal[2] = -0.18991;
+  camera.pos[0] = 0.439149;
+  camera.pos[1] = -0.10342;
+  camera.pos[2] = 0.111626;
+  camera.view[0] = 0.666149;
+  camera.view[1] = -0.0276846;
+  camera.view[2] = 0.745305;
+  camera.fovy = 0.8575;
+  camera.window_pos[0] = 0;
+  camera.window_pos[1] = 0;
+  camera.window_size[0] = 640;
+  camera.window_size[1] = 480;
+  viewer->setCameraParameters(camera);
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = points(0,i);
+    temp.y = points(1,i);
+    temp.z = points(2,i);
+    cloud->push_back(temp);
+    }
+
+
+  viewer->addPointCloud<pcl::PointXYZ>(cloud, "registered point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "registered point cloud");
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+
+  while (!viewer->wasStopped())
+  {
+    viewer->spinOnce(100);
+    boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+  }
+  viewer->close();
+}
+
+void GraspSet::plotFramePlane(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Frame Axes"));  
+  viewer->setBackgroundColor(0.0, 0.0, 0.0);
+  viewer->setPosition(0, 0);
+  viewer->setSize(640, 480);
+
+  pcl::visualization::Camera camera;
+  camera.clip[0] = 0.00130783;
+  camera.clip[1] = 1.30783;
+  camera.focal[0] = 0.776838;
+  camera.focal[1] = -0.095644;
+  camera.focal[2] = -0.18991;
+  camera.pos[0] = 0.439149;
+  camera.pos[1] = -0.10342;
+  camera.pos[2] = 0.111626;
+  camera.view[0] = 0.666149;
+  camera.view[1] = -0.0276846;
+  camera.view[2] = 0.745305;
+  camera.fovy = 0.8575;
+  camera.window_pos[0] = 0;
+  camera.window_pos[1] = 0;
+  camera.window_size[0] = 640;
+  camera.window_size[1] = 480;
+  viewer->setCameraParameters(camera);
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = points(0,i);
+    temp.y = points(1,i);
+    temp.z = points(2,i);
+    cloud->push_back(temp);
+    }
+
+
+  viewer->addPointCloud<pcl::PointXYZ>(cloud, "registered point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "registered point cloud");
+
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+  while (!viewer->wasStopped())
+  {
+    viewer->spinOnce(100);
+    boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+  }
+  viewer->close();
+}
+
+
+void GraspSet::plotFramePlane(const Eigen::Matrix4d& frame, 
+    const Eigen::Matrix3Xd& partal_points,const Eigen::Matrix3Xd& origin_points) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Frame Axes"));  
+  viewer->setBackgroundColor(0.0, 0.0, 0.0);
+  viewer->setPosition(0, 0);
+  viewer->setSize(640, 480);
+
+  pcl::visualization::Camera camera;
+  camera.clip[0] = 0.00130783;
+  camera.clip[1] = 1.30783;
+  camera.focal[0] = 0.776838;
+  camera.focal[1] = -0.095644;
+  camera.focal[2] = -0.18991;
+  camera.pos[0] = 0.439149;
+  camera.pos[1] = -0.10342;
+  camera.pos[2] = 0.111626;
+  camera.view[0] = 0.666149;
+  camera.view[1] = -0.0276846;
+  camera.view[2] = 0.745305;
+  camera.fovy = 0.8575;
+  camera.window_pos[0] = 0;
+  camera.window_pos[1] = 0;
+  camera.window_size[0] = 640;
+  camera.window_size[1] = 480;
+  viewer->setCameraParameters(camera);
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud_1(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<partal_points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = partal_points(0,i);
+    temp.y = partal_points(1,i);
+    temp.z = partal_points(2,i);
+    cloud_1->push_back(temp);
+    }
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud_2(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<origin_points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = origin_points(0,i);
+    temp.y = origin_points(1,i);
+    temp.z = origin_points(2,i);
+    cloud_2->push_back(temp);
+    }
+
+  viewer->addPointCloud<pcl::PointXYZ>(cloud_2, "origin point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "origin point cloud");
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(cloud_1, 0, 0,255); 
+  viewer->addPointCloud<pcl::PointXYZ>(cloud_1,single_color, "partial point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3,
+    "partial point cloud");
+
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+  while (!viewer->wasStopped())
+  {
+    viewer->spinOnce(100);
+    boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+  }
+  viewer->close();
+}
+
+
+void GraspSet::evaluateHypotheses(const PointList& point_list, 
+      const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local)
 //对单个局部坐标系进行评估
 {
   hands_.resize(angles_.size());
   inner_points_.resize(angles_.size());
+  // Local reference frame 之前得到的一个虚拟典范夹爪坐标系
+  Eigen::Matrix3d local_frame_mat;
+  local_frame_mat << local_frame.getNormal(), local_frame.getBinormal(), local_frame.getCurvatureAxis();
 
+  Eigen::MatrixXd local_frame_=Eigen::MatrixXd::Identity(4,4);
+  local_frame_.block(0,0,3,3)=local_frame_mat;
+  local_frame_.block(0,3,3,1)=local_frame.getSample();
+
+
+  
+  //plotFramePlane(table_pose_local,point_list.getPoints(),origin_point_list.getPoints());
   sample_ = local_frame.getSample();
   is_valid_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, angles_.size(), false);
   //
@@ -54,11 +320,11 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
       0.0,  1.0,  0.0,
       0.0,  0.0, -1.0;
   }
+  //plotFramePlane(table_pose_local,point_list.getPoints());
 
-  // Local reference frame 之前得到的一个虚拟典范夹爪坐标系
-  Eigen::Matrix3d local_frame_mat;
-  local_frame_mat << local_frame.getNormal(), local_frame.getBinormal(), local_frame.getCurvatureAxis();
 
+
+  //int num=0;
   // Evaluate grasp at each hand orientation.
   //每个抓取局部坐标系都有几个旋转值，每个旋转值对应一个候选抓取
   for (int i = 0; i < angles_.rows(); i++)
@@ -78,7 +344,9 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
     Eigen::Matrix4d table_pose_frame = table_pose_local;
     table_pose_frame.block(0,0,3,3) = frame_rot.transpose()*table_pose_frame.block(0,0,3,3);//姿态部分
     table_pose_frame.block(0,3,3,1) = frame_rot.transpose()*table_pose_frame.block(0,3,3,1);//位置部分
-
+    //plotFramePlane(table_pose_local,point_list.getPoints(),origin_point_list.getPoints());
+    //plotFramePlane(table_pose_frame,point_list_frame.getPoints(),origin_point_list_frame.getPoints());
+    //plotFramePlane(table_pose_frame,point_list_frame.getPoints());
 
     // Crop points on hand height.将点云切片，只要夹爪高度区域内部的一块点云
     PointList point_list_cropped = point_list_frame.cropByHandHeight(hand_geometry_.height_);
@@ -91,13 +359,15 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
     //如果某个偏移量下，对应的夹爪左右指都没有碰撞，就说明当前偏移量下，夹爪可行
     //评价出至少存在1个发生碰撞的抓取偏移量
     finger_hand.evaluateHand();
+
     //检查夹爪是否与桌面碰撞
-    finger_hand.collisionCheckHandTable(table_pose_frame);
+    //finger_hand.collisionCheckHandTable(table_pose_frame);
 
 
     if (finger_hand.getHand().any())
     {
-      // Try to move the hand as deep as possible onto the object.尽可能使夹爪更加靠近物体点云表面
+      // Try to move the hand as deep as possible onto the object.尽可能使夹爪在approach方向更加靠近物体点云表面
+      //得到的finger_idx 也就是最好的一个
       int finger_idx = finger_hand.deepenHand(point_list_cropped.getPoints(), hand_geometry_.init_bite_, hand_geometry_.depth_);
 
       // Calculate points in the closing region of the hand.如果夹爪内部没有点，就舍弃该抓取姿态
@@ -107,6 +377,12 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
       {
         continue;
       }
+      //检查夹爪是否与桌面碰撞
+      if (finger_hand.collisionCheckHandTable(table_pose_frame))
+      {
+        continue;
+      }
+
       //把夹爪内部的点抽取出来
       PointList points_in_closing_region=point_list_cropped.slice(indices_closing);
 
@@ -119,11 +395,133 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
       //把当前候选抓取配置存起来
       hands_[i] = hand;
       is_valid_[i] = true;
+      //num++;
+      //在这里把截取的点云区域存下来
+      inner_points_[i]=points_in_closing_region;
+    }
+  }
+  //std::cout<< num<<std::endl;
+}
+
+
+
+void GraspSet::evaluateHypotheses(const PointList& point_list, const PointList& origin_point_list, 
+    const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local)
+//对单个局部坐标系进行评估
+{
+  hands_.resize(angles_.size());
+  inner_points_.resize(angles_.size());
+  // Local reference frame 之前得到的一个虚拟典范夹爪坐标系
+  Eigen::Matrix3d local_frame_mat;
+  local_frame_mat << local_frame.getNormal(), local_frame.getBinormal(), local_frame.getCurvatureAxis();
+
+  Eigen::MatrixXd local_frame_=Eigen::MatrixXd::Identity(4,4);
+  local_frame_.block(0,0,3,3)=local_frame_mat;
+  local_frame_.block(0,3,3,1)=local_frame.getSample();
+
+
+  
+  //plotFramePlane(table_pose_local,point_list.getPoints(),origin_point_list.getPoints());
+  sample_ = local_frame.getSample();
+  is_valid_ = Eigen::Array<bool, 1, Eigen::Dynamic>::Constant(1, angles_.size(), false);
+  //
+  FingerHand finger_hand(hand_geometry_.finger_width_, hand_geometry_.outer_diameter_, hand_geometry_.depth_,hand_geometry_.height_);
+  Eigen::Matrix3d rot_binormal;
+
+  // Set the lateral and forward axis of the robot hand frame (closing direction and grasp approach direction).
+  if (rotation_axis_ == ROTATION_AXIS_CURVATURE_AXIS)
+  {
+    finger_hand.setLateralAxis(1);
+    finger_hand.setForwardAxis(0);
+
+    // Rotation about binormal by 180 degrees (reverses direction of normal)
+    rot_binormal <<  -1.0,  0.0,  0.0,
+      0.0,  1.0,  0.0,
+      0.0,  0.0, -1.0;
+  }
+  //plotFramePlane(table_pose_local,point_list.getPoints());
+
+
+
+  //int num=0;
+  // Evaluate grasp at each hand orientation.
+  //每个抓取局部坐标系都有几个旋转值，每个旋转值对应一个候选抓取
+  for (int i = 0; i < angles_.rows(); i++)
+  {
+    // Rotation about curvature axis by <angles_(i)> radians
+    Eigen::Matrix3d rot;
+    rot <<  cos(angles_(i)),  -1.0 * sin(angles_(i)),   0.0,
+      sin(angles_(i)),  cos(angles_(i)),          0.0,
+      0.0,              0.0,                      1.0;
+
+    // Rotate points into this hand orientation. 把点云按照夹爪姿态旋转到局部坐标系中
+    Eigen::Matrix3d frame_rot;
+    frame_rot.noalias() = local_frame_mat * rot_binormal * rot;
+    //仅仅对点云进行旋转，不平移，因为之前已经平移过了
+    PointList point_list_frame = point_list.rotatePointList(frame_rot.transpose());
+    PointList origin_point_list_frame = origin_point_list.rotatePointList(frame_rot.transpose());
+    //对桌面坐标系进行旋转
+    Eigen::Matrix4d table_pose_frame = table_pose_local;
+    table_pose_frame.block(0,0,3,3) = frame_rot.transpose()*table_pose_frame.block(0,0,3,3);//姿态部分
+    table_pose_frame.block(0,3,3,1) = frame_rot.transpose()*table_pose_frame.block(0,3,3,1);//位置部分
+    //plotFramePlane(table_pose_local,point_list.getPoints(),origin_point_list.getPoints());
+    //plotFramePlane(table_pose_frame,point_list_frame.getPoints(),origin_point_list_frame.getPoints());
+    //plotFramePlane(table_pose_frame,point_list_frame.getPoints());
+
+    // Crop points on hand height.将点云切片，只要夹爪高度区域内部的一块点云
+    PointList point_list_cropped = point_list_frame.cropByHandHeight(hand_geometry_.height_);
+
+    // Evaluate finger placements for this orientation.评估在binormal轴向不同的偏移量下，
+    //评估左右手指是否与点云接触
+    finger_hand.evaluateFingers(point_list_cropped.getPoints(), hand_geometry_.init_bite_);
+
+    // Check that there is at least one feasible 2-finger placement.
+    //如果某个偏移量下，对应的夹爪左右指都没有碰撞，就说明当前偏移量下，夹爪可行
+    //评价出至少存在1个发生碰撞的抓取偏移量
+    finger_hand.evaluateHand();
+
+    //检查夹爪是否与桌面碰撞
+    //finger_hand.collisionCheckHandTable(table_pose_frame);
+
+
+    if (finger_hand.getHand().any())
+    {
+      // Try to move the hand as deep as possible onto the object.尽可能使夹爪在approach方向更加靠近物体点云表面
+      //得到的finger_idx 也就是最好的一个
+      int finger_idx = finger_hand.deepenHand(point_list_cropped.getPoints(), hand_geometry_.init_bite_, hand_geometry_.depth_);
+
+      // Calculate points in the closing region of the hand.如果夹爪内部没有点，就舍弃该抓取姿态
+      std::vector<int> indices_closing = finger_hand.computePointsInClosingRegion(point_list_cropped.getPoints(), finger_idx);
+      //夹爪内部至少要有一个点
+      if (indices_closing.size() == 0)
+      {
+        continue;
+      }
+      //检查夹爪是否与桌面碰撞
+      if (finger_hand.collisionCheckHandTable(table_pose_frame))
+      {
+        continue;
+      }
+
+      //把夹爪内部的点抽取出来
+      PointList points_in_closing_region=point_list_cropped.slice(indices_closing);
+
+      // create the grasp hypothesis针对该旋转angle创建一个候选抓取配置
+      Grasp hand = createHypothesis(local_frame.getSample(), point_list_cropped, indices_closing, frame_rot,
+        finger_hand);
+      //将夹爪各个点旋转到桌面坐标系下
+
+
+      //把当前候选抓取配置存起来
+      hands_[i] = hand;
+      is_valid_[i] = true;
+      //num++;
       //在这里把截取的点云区域存下来
       inner_points_[i]=points_in_closing_region;
 
     }
   }
+  //std::cout<< num<<std::endl;
 }
 
 void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame)
@@ -145,12 +543,13 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
     finger_hand.setForwardAxis(0);
 
     // Rotation about binormal by 180 degrees (reverses direction of normal)
+    //保证初始状态时，夹爪approach方向与表面法向量方向相反
     rot_binormal <<  -1.0,  0.0,  0.0,
-      0.0,  1.0,  0.0,
-      0.0,  0.0, -1.0;
+                                          0.0,  1.0,  0.0,
+                                          0.0,  0.0, -1.0;
   }
 
-  // Local reference frame 之前得到的一个虚拟典范夹爪坐标系
+  // Local reference frame 局部坐标系在相机坐标系中的位置姿态
   Eigen::Matrix3d local_frame_mat;
   local_frame_mat << local_frame.getNormal(), local_frame.getBinormal(), local_frame.getCurvatureAxis();
 
@@ -160,12 +559,14 @@ void GraspSet::evaluateHypotheses(const PointList& point_list, const LocalFrame&
   {
     // Rotation about curvature axis by <angles_(i)> radians
     Eigen::Matrix3d rot;
+    //这里表现的是绕运动坐标系z轴旋转
     rot <<  cos(angles_(i)),  -1.0 * sin(angles_(i)),   0.0,
       sin(angles_(i)),  cos(angles_(i)),          0.0,
       0.0,              0.0,                      1.0;
 
     // Rotate points into this hand orientation. 把点云按照夹爪姿态旋转到局部坐标系中
     Eigen::Matrix3d frame_rot;
+    //右乘，相对于local frame做变换，得到新的相对于相机坐标系的坐标系表示
     frame_rot.noalias() = local_frame_mat * rot_binormal * rot;
     //仅仅对点云进行旋转，不平移，因为之前已经平移过了
     PointList point_list_frame = point_list.rotatePointList(frame_rot.transpose());

@@ -73,6 +73,7 @@ class CandidatesGenerator
       bool plot_grasps_; ///< if grasps are plotted
       bool remove_statistical_outliers_; ///< if statistical outliers are removed from the point cloud
       bool voxelize_; ///< if the point cloud gets voxelized
+      bool remove_table_;
       int num_samples_; ///< the number of samples to be used in the search
       int num_threads_; ///< the number of CPU threads to be used in the search
       std::vector<double> workspace_; ///< the robot's workspace

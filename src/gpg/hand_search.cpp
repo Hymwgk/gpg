@@ -6,7 +6,7 @@ const int HandSearch::ROTATION_AXIS_BINORMAL = 1;
 const int HandSearch::ROTATION_AXIS_CURVATURE_AXIS = 2;
 
 
-HandSearch::HandSearch(Parameters params) : params_(params), plots_samples_(false), plots_local_axes_(false),
+HandSearch::HandSearch(Parameters params) : params_(params), plots_samples_(true), plots_local_axes_(false),
   plots_camera_sources_(false)
 {
   // Calculate radius for nearest neighbor search.
@@ -53,6 +53,8 @@ std::vector<GraspSet> HandSearch::searchHands(const CloudCamera& cloud_cam, bool
       plot_.plotSamples(cloud_cam.getSamples(), cloud_cam.getCloudProcessed());
     }
   }
+  //画出桌面标签坐标系
+  //plot_.plotFrameAxes(cloud_cam.getTablePose(),cloud_cam.getCloudProcessed());
 
   // 1. Estimate local reference frames.
   //第一步在目标点云中采样得到指定数量的局部坐标系
@@ -72,6 +74,7 @@ std::vector<GraspSet> HandSearch::searchHands(const CloudCamera& cloud_cam, bool
   }
 
   if (plots_local_axes_)
+  //if (1)
     plot_.plotLocalAxes(frames, cloud_cam.getCloudOriginal());
 
   // 2. Evaluate possible hand placements.
@@ -184,8 +187,12 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
   std::vector<float> nn_dists;
   const PointCloudRGB::Ptr& cloud = cloud_cam.getCloudProcessed();
   Eigen::Matrix3Xd points = cloud->getMatrixXfMap().block(0, 0, 3, cloud->size()).cast<double>();
+  //Eigen::Matrix3Xd points_copy = cloud->getMatrixXfMap().block(0, 0, 3, cloud->size()).cast<double>();
+
+  std::cout<<frames.size()<<std::endl;
   std::vector<GraspSet> hand_set_list(frames.size());
   PointList point_list(points, cloud_cam.getNormals(), cloud_cam.getCameraSource(), cloud_cam.getViewPoints());
+  //PointList point_list_copy(points_copy, cloud_cam.getNormals(), cloud_cam.getCameraSource(), cloud_cam.getViewPoints());;
   PointList nn_points;
   Eigen::Matrix4d table_pose;
   if(cloud_cam.has_table)
@@ -209,21 +216,28 @@ std::vector<GraspSet> HandSearch::evaluateHands(const CloudCamera& cloud_cam, co
       nn_points = point_list.slice(nn_indices);
       //在这里对点云进行了平移，变成以局部坐标系为中心
       nn_points.setPoints(nn_points.getPoints() - frames[i].getSample().replicate(1, nn_points.size()));
+      //point_list_copy.setPoints(point_list_copy.getPoints() - frames[i].getSample().replicate(1, point_list_copy.size()));
       //对桌面坐标系也进行平移
       Eigen::Matrix4d table_pose_local;
       if(cloud_cam.has_table)
       {
-        Eigen::MatrixXd temp(4,1);
-        temp << frames[i].getSample()[0],frames[i].getSample()[1],frames[i].getSample()[2],1.0;
+        Eigen::Vector3d temp;
+        temp=frames[i].getSample();
         table_pose_local = table_pose;
-        table_pose_local.block(0,3,3,1) -= temp.block(0,0,3,1);
+        table_pose_local.block(0,3,3,1) -= temp;
       }
       //根据旋转参数，初始化一些抓取配置
       GraspSet hand_set(hand_geom, angles, params_.rotation_axis_);
       //然后对这些局部坐标系进行评估，在hand_set内部就会针对frames[i]计算出一个候选抓取集合
       if(cloud_cam.has_table)
       {
-        hand_set.evaluateHypotheses(nn_points, frames[i],table_pose_local);
+        //plot_.plotFrameAxes(table_pose_local,nn_points.getPoints());
+        //hand_set.evaluateHypotheses(nn_points,point_list_copy,frames[i],table_pose_local);
+        hand_set.evaluateHypotheses(nn_points,frames[i],table_pose_local);
+        //hand_set.evaluateHypotheses(nn_points, frames[i]);
+        //std::cout <<i<<std::endl;
+
+
       }
       else{
         hand_set.evaluateHypotheses(nn_points, frames[i]);

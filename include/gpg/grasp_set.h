@@ -57,6 +57,7 @@
 #include <gpg/grasp.h>
 #include <gpg/local_frame.h>
 #include <gpg/point_list.h>
+//#include <gpg/plot.h>
 
 
 // The hash and equality functions below are necessary for boost's unordered set.
@@ -172,6 +173,8 @@ class GraspSet
      * \param local_frame the local reference frame
      */
     void evaluateHypotheses(const PointList& point_list, const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local);
+    void evaluateHypotheses(const PointList& point_list, const PointList& origin_point_list, 
+        const LocalFrame& local_frame,const Eigen::Matrix4d& table_pose_local);
 
     /**
      * \brief Calculate the set of shadow points for a grasp set.
@@ -254,6 +257,12 @@ class GraspSet
       is_valid_[idx] = val;
     }
 
+  void plotFrameAxes(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const;
+
+  void plotFramePlane(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& points) const;
+
+  void plotFramePlane(const Eigen::Matrix4d& frame, const Eigen::Matrix3Xd& partal_points,
+          const Eigen::Matrix3Xd& origin_points) const;
 
   private:
 
@@ -327,6 +336,9 @@ class GraspSet
     static const int ROTATION_AXIS_CURVATURE_AXIS; ///< curvature axis of local reference frame
 
     static const bool MEASURE_TIME; ///< if runtime is measured
+
+    //Plot plotter_; ///< pointer to an object for plotting
+
 };
 
 #endif /* GRASP_SET_H_ */

@@ -98,39 +98,191 @@ void FingerHand::evaluateHand()
   }
 }
 
-void FingerHand::collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame)
+bool FingerHand::collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame)
 {
   const int n = hand_.size();
+  Eigen::MatrixXd hand_points_collision;
+  Eigen::Vector3d table_pose_z_axis(table_pose_frame.col(2).head(3).data());
 
-  for (int i = 0; i < n; i++)
-  {
+  //plotFramePlane(hand_points_,table_pose_frame,partal_points,origin_points);
+    //std::cout<<hand_<<std::endl;
     //构建偏移向量
-    Eigen::Vector3d offset;
-    offset << 0.0,finger_spacing_[i],0.0;
+  Eigen::Vector3d offset;
+  offset << bottom_,center_,0.0;
 
-    //对夹爪上的每个点坐标进行偏移
-    Eigen::Matrix3Xd hand_points_collision = hand_points_;
-    hand_points_collision.rowwise()+=offset.transpose();
-
-    //检查偏移后的夹爪各点是否与桌面碰撞
-    //计算桌面标签原点指向夹爪各点的向量
-    hand_points_collision.rowwise() -=table_pose_frame.block(0,3,3,1).transpose();
-    //计算各个向量与桌面标签z轴夹角
-    //对每个行向量都单位化
-    hand_points_collision.rowwise().normalize();
-    //broadcast 以及 对应元素相乘
-    hand_points_collision = hand_points_collision.cwiseProduct(table_pose_frame.block(0,3,3,1).transpose());
-    //每行都求和
-    Eigen::VectorXd row_sum= hand_points_collision.rowwise().sum();
-    //找出最小值
-    double min_r = row_sum.minCoeff();
-    //如果最小值>=0就代表，所有角点都位于桌面之上;否则，与桌面有碰撞
-    if(min_r<0)
-    {
-      hand_[i]=false;
-    }
+  //对夹爪上的每个点坐标进行偏移
+  hand_points_collision = hand_points_;
+  hand_points_collision.rowwise()+=offset.transpose();
+  //plotFramePlane(hand_points_collision,table_pose_frame,partal_points,origin_points);
+  //检查偏移后的夹爪各点是否与桌面碰撞
+  //计算桌面标签原点指向夹爪各点的向量
+  //Eigen::Vector3d temp = table_pose_frame.col(3).head(3);
+  hand_points_collision.rowwise() -=table_pose_frame.col(3).head(3).transpose();
+  //计算各个向量与桌面标签z轴夹角
+  //对每个行向量都单位化
+  hand_points_collision.rowwise().normalize();
+  //broadcast 以及 对应元素相乘
+  hand_points_collision = hand_points_collision.cwiseProduct(table_pose_z_axis.transpose().replicate(21,1));
+  //每行都求和,找出最小值
+  double min_r = hand_points_collision.rowwise().sum().minCoeff();
+  
+  if(min_r<0)
+  {
+    return true;//发生了碰撞
   }
+  return false;//没有发生碰撞
 }
+
+bool FingerHand::collisionCheckHandTable(const Eigen::Matrix4d& table_pose_frame,
+  const Eigen::Matrix3Xd& partal_points,const Eigen::Matrix3Xd& origin_points)
+{
+  const int n = hand_.size();
+  Eigen::MatrixXd hand_points_collision;
+  Eigen::Vector3d table_pose_z_axis(table_pose_frame.col(2).head(3).data());
+
+  //plotFramePlane(hand_points_,table_pose_frame,partal_points,origin_points);
+    //std::cout<<hand_<<std::endl;
+    //构建偏移向量
+  Eigen::Vector3d offset;
+  offset << bottom_,center_,0.0;
+
+  //对夹爪上的每个点坐标进行偏移
+  hand_points_collision = hand_points_;
+  hand_points_collision.rowwise()+=offset.transpose();
+  plotFramePlane(hand_points_collision,table_pose_frame,partal_points,origin_points);
+  //检查偏移后的夹爪各点是否与桌面碰撞
+  //计算桌面标签原点指向夹爪各点的向量
+  //Eigen::Vector3d temp = table_pose_frame.col(3).head(3);
+  hand_points_collision.rowwise() -=table_pose_frame.col(3).head(3).transpose();
+  //计算各个向量与桌面标签z轴夹角
+  //对每个行向量都单位化
+  hand_points_collision.rowwise().normalize();
+  //broadcast 以及 对应元素相乘
+  hand_points_collision = hand_points_collision.cwiseProduct(table_pose_z_axis.transpose().replicate(21,1));
+  //每行都求和,找出最小值
+  double min_r = hand_points_collision.rowwise().sum().minCoeff();
+  
+  if(min_r<0)
+  {
+    return true;//发生了碰撞
+  }
+  return false;//没有发生碰撞
+}
+
+
+void FingerHand::plotFramePlane(const Eigen::MatrixXd hand_points_collision,const Eigen::Matrix4d& frame, 
+    const Eigen::Matrix3Xd& partal_points,const Eigen::Matrix3Xd& origin_points) const
+{
+  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer(new pcl::visualization::PCLVisualizer("Frame Axes"));  
+  viewer->setBackgroundColor(0.0, 0.0, 0.0);
+  viewer->setPosition(0, 0);
+  viewer->setSize(640, 480);
+
+  pcl::visualization::Camera camera;
+  camera.clip[0] = 0.00130783;
+  camera.clip[1] = 1.30783;
+  camera.focal[0] = 0.776838;
+  camera.focal[1] = -0.095644;
+  camera.focal[2] = -0.18991;
+  camera.pos[0] = 0.439149;
+  camera.pos[1] = -0.10342;
+  camera.pos[2] = 0.111626;
+  camera.view[0] = 0.666149;
+  camera.view[1] = -0.0276846;
+  camera.view[2] = 0.745305;
+  camera.fovy = 0.8575;
+  camera.window_pos[0] = 0;
+  camera.window_pos[1] = 0;
+  camera.window_size[0] = 640;
+  camera.window_size[1] = 480;
+  viewer->setCameraParameters(camera);
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud_1(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<partal_points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = partal_points(0,i);
+    temp.y = partal_points(1,i);
+    temp.z = partal_points(2,i);
+    cloud_1->push_back(temp);
+    }
+
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  cloud_2(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<origin_points.cols();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = origin_points(0,i);
+    temp.y = origin_points(1,i);
+    temp.z = origin_points(2,i);
+    cloud_2->push_back(temp);
+    }
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ>>  hand_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  for (int i=0;i<hand_points_collision.rows();i++)
+  {
+    pcl::PointXYZ temp;
+    temp.x = hand_points_collision(i,0);
+    temp.y = hand_points_collision(i,1);
+    temp.z = hand_points_collision(i,2);
+    hand_cloud->push_back(temp);
+    }
+
+
+  viewer->addPointCloud<pcl::PointXYZ>(cloud_2, "origin point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1,
+    "origin point cloud");
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(cloud_1, 0, 0,255); 
+  viewer->addPointCloud<pcl::PointXYZ>(cloud_1,single_color, "partial point cloud");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3,
+    "partial point cloud");
+
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> hand_color(hand_cloud, 255, 0,0); 
+  viewer->addPointCloud<pcl::PointXYZ>(hand_cloud,hand_color, "hand points");
+  viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3,
+    "hand points");
+
+  //根据坐标系位姿，反解出x-o-y平面参数
+  double d = -(frame(0,2)*frame(0,3)+frame(1,2)*frame(1,3)+frame(2,2)*frame(2,3));
+  pcl::ModelCoefficients coeffs;
+  std::cout << "table coefficients: " << float(frame(0,2)) << " " 
+                                        << float(frame(1,2)) << " "
+                                        << float(frame(2,2)) << " " 
+                                        << float(d) << std::endl;
+
+  coeffs.values.push_back (float(frame(0,2)));
+  coeffs.values.push_back (float(frame(1,2)));
+  coeffs.values.push_back (float(frame(2,2)));
+  coeffs.values.push_back (float(d));
+  viewer->addPlane (coeffs);
+
+  pcl::PointXYZ o, x_, y_,z_;
+  o.x = frame(0,3);
+  o.y = frame(1,3);
+  o.z = frame(2,3);
+  x_.x = o.x + 0.02 * frame(0,0);
+  x_.y = o.y + 0.02 * frame(1,0);
+  x_.z = o.z + 0.02 * frame(2,0);
+
+  y_.x = o.x + 0.02 * frame(0,1);
+  y_.y = o.y + 0.02 * frame(1,1);
+  y_.z = o.z + 0.02 * frame(2,1);
+
+  z_.x = o.x + 0.02 * frame(0,2);
+  z_.y = o.y + 0.02 * frame(1,2);
+  z_.z = o.z + 0.02 * frame(2,2);
+
+
+  viewer->addLine<pcl::PointXYZ>(o, x_, 255, 0, 0, "x_axis_");
+  viewer->addLine<pcl::PointXYZ>(o, y_, 0, 255, 0, "y_axis_" );
+  viewer->addLine<pcl::PointXYZ>(o, z_, 0, 0, 255, "z_axis_");
+
+  while (!viewer->wasStopped())
+  {
+    viewer->spinOnce(100);
+    boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+  }
+  viewer->close();
+}
+
 
 
 void FingerHand::evaluateHand(int idx)
@@ -149,6 +301,7 @@ int FingerHand::deepenHand(const Eigen::Matrix3Xd& points, double min_depth, dou
   {
     if (hand_(i) == true)
     {
+      //把有效的抓取id存起来
       hand_idx.push_back(i);
     }
   }
@@ -158,7 +311,7 @@ int FingerHand::deepenHand(const Eigen::Matrix3Xd& points, double min_depth, dou
     return -1;
   }
 
-  // Choose middle hand.
+  // Choose middle hand.在有效抓取的id中，找到中间的一个
   int hand_eroded_idx = hand_idx[ceil(hand_idx.size() / 2.0) - 1]; // middle index
   int opposite_idx = fingers_.size() / 2 + hand_eroded_idx; // opposite finger index
 
@@ -228,7 +381,7 @@ std::vector<int> FingerHand::computePointsInClosingRegion(const Eigen::Matrix3Xd
   return indices;
 }
 
-Eigen::Matrix3Xd FingerHand::getHandPoints(const Eigen::Vector3d &bottom_center,
+Eigen::MatrixXd FingerHand::getHandPoints(const Eigen::Vector3d &bottom_center,
   const Eigen::Vector3d &approach,const Eigen::Vector3d &binormal)
 {
   double hh = hand_height_;
@@ -279,7 +432,7 @@ Eigen::Matrix3Xd FingerHand::getHandPoints(const Eigen::Vector3d &bottom_center,
   
   p_v << p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15,p16,p17,p18,p19,p20;
   //得到手指各点的矩阵(n*3)
-  Eigen::Matrix3Xd p_m = Eigen::Map<Eigen::Matrix<double, 3,Dynamic,RowMajor>>(p_v.data());
+  Eigen::MatrixXd p_m = Eigen::Map<Eigen::Matrix<double, 21,3,RowMajor>>(p_v.data());
   
   return p_m;
 }

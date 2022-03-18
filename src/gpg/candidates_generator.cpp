@@ -41,6 +41,7 @@ void CandidatesGenerator::preprocessPointCloud(CloudCamera& cloud_cam)
     //    plotter.drawCloud(cloud_cam.getCloudProcessed(), "after");
   }
 
+
   // No indices into point cloud given
   if (cloud_cam.getSampleIndices().size() == 0)
   {
@@ -52,6 +53,17 @@ void CandidatesGenerator::preprocessPointCloud(CloudCamera& cloud_cam)
     {
       return;
     }
+    // 剔除桌面点云
+    if (params_.remove_table_)
+    {
+      cloud_cam.sampleAbovePlane();
+      std::cout << "After table filtering: " << cloud_cam.getCloudProcessed()->size() << " points left.\n";
+    }
+    if (cloud_cam.getCloudProcessed()->size() == 0)
+    {
+      return;
+    }
+
 
     // 2. Voxelization
     if (params_.voxelize_)
@@ -148,7 +160,7 @@ std::vector<Grasp> CandidatesGenerator::generateGraspCandidates(const CloudCamer
   if (params_.plot_grasps_)
   {
     const HandSearch::Parameters& params = hand_search_->getParams();
-    plotter_.plotFingers3D(candidates, cloud_cam.getCloudOriginal(), "Grasp Candidates", params.hand_outer_diameter_,
+    plotter_.plotFingers3D(candidates, cloud_cam.getCloudProcessed(), "Grasp Candidates", params.hand_outer_diameter_,
       params.finger_width_, params.hand_depth_, params.hand_height_);
   }
 
@@ -188,7 +200,9 @@ CandidatesGenerator::GraspsWithPoints CandidatesGenerator::generateGraspCandidat
   if (params_.plot_grasps_)
   {
     const HandSearch::Parameters& params = hand_search_->getParams();
-    plotter_.plotFingers3D(grasps_with_points.candidates, cloud_cam.getCloudOriginal(), "Grasp Candidates", params.hand_outer_diameter_,
+    //plotter_.plotFingers3D(grasps_with_points.candidates, cloud_cam.getCloudProcessed(), "Grasp Candidates", params.hand_outer_diameter_,
+    //  params.finger_width_, params.hand_depth_, params.hand_height_);
+    plotter_.plotFingers3D(cloud_cam.getTablePose(),grasps_with_points.candidates, cloud_cam.getCloudProcessed(), "Grasp Candidates", params.hand_outer_diameter_,
       params.finger_width_, params.hand_depth_, params.hand_height_);
   }
 

@@ -365,7 +365,7 @@ private:
 
 protected:
 
-  Eigen::Vector3d sample_; ///< the sample at which the grasp hypothesis was found
+  Eigen::Vector3d sample_; ///< the sample at which the grasp hypothesis was found 抓取对应的局部坐标系的原点
   double grasp_width_; ///< the width of object enclosed by the fingers
 
   GraspPose pose_; ///< the grasp pose

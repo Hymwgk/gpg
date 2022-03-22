@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_conversions
   pcl_ros
   tf
+  message_generation
 )
 #我使用了自己安装的pcl1.9  因为ros自带的pcl有些问题，用不了
 set(PCL_DIR "/usr/share/pcl-1.9/")
@@ -59,18 +60,26 @@ add_definitions(${PCL_DEFINITIONS})
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(FILES 
+		CloudIndexed.msg 
+		CloudSamples.msg 
+		CloudSources.msg 
+		GraspConfig.msg 
+		GraspConfigList.msg
+		SamplesMsg.msg  
+		GraspAndPointsList.msg 
+		GripperInnerPoints.msg)
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(FILES 
+		detect_grasps.srv 
+		pointnet_gpd.srv)
+
+## Generate added messages and services with any dependencies listed here
+generate_messages(DEPENDENCIES 
+		geometry_msgs 
+		sensor_msgs 
+    std_msgs)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -115,10 +124,10 @@ add_definitions(${PCL_DEFINITIONS})
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES point_cloud_process
-#  CATKIN_DEPENDS roscpp rospy std_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+
+  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+  DEPENDS system_lib
 )
 
 ###########

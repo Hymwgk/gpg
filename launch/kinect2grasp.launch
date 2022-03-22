@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<!-- 接收末端执行器姿态执行抓取-->
+<launch>
+  <arg name="gpg_prarm" default="$(find gpg)/cfg/params.cfg"  />
+  <arg name="publish_tf" default="true" />
+  <arg name="load-model" default="$(find gpg)/data/1v_750_2class_ourway2sample.model" />
+  <arg name="gpu" default="0"/>
+  <arg name="loop_num" default="3"/>
+  <arg name="test" default="0"/>
+
+  <!--发布手眼变换关系-->
+  <!--include file="$(find panda_moveit_config)/launch/zzu_panda_move.launch" /-->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find gpg)/cfg/moveit_rviz.rviz" required="true" />
+
+  <!--发布手眼变换关系-->
+  <include file="$(find panda_hand_eye_calibrate)/launch/publish_panda_eob.launch" />
+
+
+  <!--启动抓取分类器-->
+  <node name="classifier" pkg="gpg" type="grasp_classifier.py" output="screen" args="--cuda --load-model $(arg load-model) --gup $(arg gpu) --loop_num $(arg loop_num)" required="true"/>
+
+
+  <!--检测抓取-->
+  <node name="gpg" pkg="gpg" type="gpg_online"  respawn="false"  args="$(arg gpg_prarm)"  output="screen" required="true"/>
+  <!--执行抓取-->
+  <node name="grasp" pkg="gpg" type="panda_grasp.py"  output="screen" args="--test $(arg test)"/>
+
+</launch>

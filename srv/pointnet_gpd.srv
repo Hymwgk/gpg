@@ -1,0 +1,5 @@
+#送给网络进行分类
+gpg/GraspAndPointsList candidates
+---
+#返回最优的抓取的id
+std_msgs/Int64 best_grasp_id

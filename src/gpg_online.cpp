@@ -14,6 +14,16 @@
 #include <gpg/hand_search.h>
 #include <gpg/config_file.h>
 #include <gpg/plot.h>
+
+#include "/home/wgk/catkin_ws/devel/include/gpg/GraspConfig.h"
+#include "/home/wgk/catkin_ws/devel/include/gpg/GraspAndPointsList.h"
+#include "/home/wgk/catkin_ws/devel/include/gpg/pointnet_gpd.h"
+#include "/home/wgk/catkin_ws/devel/include/gpg/GraspConfigList.h"
+#include "/home/wgk/catkin_ws/devel/include/gpg/GripperInnerPoints.h"
+#include <geometry_msgs/Point.h>
+
+//#include "gpg/GraspConfig.h"
+
 using namespace std;
 using namespace pcl;
 // function to read in a double array from a single line of a configuration file
@@ -39,8 +49,11 @@ class GPG_ONLINE
 {
 	public:
   	ros::NodeHandle nh;
-		ros::Publisher pub;
+		ros::Publisher pub_best_grasp;
+		ros::Publisher pub_grasp_list;
+
 		ros::Subscriber sub;
+    ros::ServiceClient client;
 
     tf::TransformListener listener;
 
@@ -139,33 +152,103 @@ class GPG_ONLINE
     //CloudCamera cloud_cam(argv[2], view_points);
     //订阅kinect点云话题
     sub = nh.subscribe<sensor_msgs::PointCloud2> ("/kinect2/qhd/points", 1, &GPG_ONLINE::gpg,this);
+    client = nh.serviceClient<gpg::pointnet_gpd>("grasp_classification");
+    pub_best_grasp = nh.advertise<gpg::GraspConfig>("best_grasp", 1000);
+    pub_grasp_list = nh.advertise<gpg::GraspConfigList>("grasp_list", 1000);
+
+    client.waitForExistence();
   }
 
   void gpg (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   {
-    Eigen::Matrix3Xd view_points(3,1);
-    view_points << camera_pose[3], camera_pose[6], camera_pose[9];
-    //得到桌面标签坐标系
-    Eigen::Matrix<double, 1, 16>  table_pose_v(table_pose.data());
-
-    Eigen::Matrix4d table_pose_m = Eigen::Map<Eigen::Matrix4d>(table_pose_v.data()).transpose();
-
-    PointCloudRGB::Ptr cloud(new PointCloudRGB());
-		//把kinect点云数据转化为pcl::PointXYZRGBA
-		pcl::fromROSMsg	(*cloud_msg,*cloud);
-    camera_source = Eigen::MatrixXi::Ones(1, cloud->size());
-    //(点云+相机)整体对象
-    CloudCamera cloud_cam(cloud,camera_source,view_points,table_pose_m);
-    if (cloud_cam.getCloudOriginal()->size() == 0)
+    string robot_state;
+    nh.getParam("/robot_state",robot_state);
+    //robot_state="ready";
+    if(robot_state == "ready")
     {
-      ROS_WARN("Input point cloud is empty or does not exist!\n");
-    }
-    // 点云预处理，包括点云体素降采样，移除离群点，工作空间滤除(直通滤波)，计算法向量Point cloud preprocessing: voxelize, remove statistical outliers, workspace filter, compute normals, subsample.
-    candidates_generator->preprocessPointCloud(cloud_cam);
+      Eigen::Matrix3Xd view_points(3,1);
+      view_points << camera_pose[3], camera_pose[6], camera_pose[9];
+      //得到桌面标签坐标系
+      Eigen::Matrix<double, 1, 16>  table_pose_v(table_pose.data());
 
-    //进行采样得到系列候选抓取 以及它们夹爪内部区域的点云集合
-    CandidatesGenerator::GraspsWithPoints grasps_with_points= candidates_generator->generateGraspCandidatesWithInnerPoints(cloud_cam);
-    //
+      Eigen::Matrix4d table_pose_m = Eigen::Map<Eigen::Matrix4d>(table_pose_v.data()).transpose();
+
+      PointCloudRGB::Ptr cloud(new PointCloudRGB());
+      //把kinect点云数据转化为pcl::PointXYZRGBA
+      pcl::fromROSMsg	(*cloud_msg,*cloud);
+      camera_source = Eigen::MatrixXi::Ones(1, cloud->size());
+      //(点云+相机)整体对象
+      CloudCamera cloud_cam(cloud,camera_source,view_points,table_pose_m);
+      if (cloud_cam.getCloudOriginal()->size() == 0)
+      {
+        ROS_WARN("Input point cloud is empty or does not exist!\n");
+      }
+      // 点云预处理，包括点云体素降采样，移除离群点，工作空间滤除(直通滤波)，计算法向量Point cloud preprocessing: voxelize, remove statistical outliers, workspace filter, compute normals, subsample.
+      candidates_generator->preprocessPointCloud(cloud_cam);
+
+      //进行采样得到系列候选抓取 以及它们夹爪内部区域的点云集合
+      CandidatesGenerator::GraspsWithPoints grasps_with_points= candidates_generator->generateGraspCandidatesWithInnerPoints(cloud_cam);
+      //
+      gpg::pointnet_gpd srv;
+      gpg::GraspConfigList grasp_list;
+      //srv.request.candidates
+      for(int i=0;i<grasps_with_points.candidates.size();i++)
+      {
+        //设置抓取位置姿态，这里使用的是典范抓取坐标系，坐标系原点位于top  center
+        gpg::GraspConfig grasp;
+        grasp.position.x = grasps_with_points.candidates[i].getGraspTop()[0];
+        grasp.position.y = grasps_with_points.candidates[i].getGraspTop()[1];
+        grasp.position.z = grasps_with_points.candidates[i].getGraspTop()[2];
+
+        grasp.approach.x = grasps_with_points.candidates[i].getApproach()[0];
+        grasp.approach.y = grasps_with_points.candidates[i].getApproach()[1];
+        grasp.approach.z = grasps_with_points.candidates[i].getApproach()[2];
+
+        grasp.binormal.x = grasps_with_points.candidates[i].getBinormal()[0];
+        grasp.binormal.y = grasps_with_points.candidates[i].getBinormal()[1];
+        grasp.binormal.z = grasps_with_points.candidates[i].getBinormal()[2];
+        
+        grasp.axis.x = grasps_with_points.candidates[i].getAxis()[0];
+        grasp.axis.y = grasps_with_points.candidates[i].getAxis()[1];
+        grasp.axis.z = grasps_with_points.candidates[i].getAxis()[2];
+
+        //设置点云
+        gpg::GripperInnerPoints  gripper_inner_points;
+        for(uint32_t m=0;m<grasps_with_points.inner_points[i].cols();m++)
+        {
+          geometry_msgs::Point point;
+          point.x = grasps_with_points.inner_points[i](0,m);
+          point.y = grasps_with_points.inner_points[i](1,m);
+          point.z = grasps_with_points.inner_points[i](2,m);
+          gripper_inner_points.points.push_back(point);
+        }
+        srv.request.candidates.grasps.push_back(grasp);
+        srv.request.candidates.inner_points.push_back(gripper_inner_points);
+        grasp_list.grasps.push_back(grasp);
+      }
+
+      //调用pointnet的判别服务
+      if(client.call(srv)&&(grasp_list.grasps.size()!=0))
+      {
+        gpg::GraspConfig best_grasp;
+        //拿到最好的抓取
+        int best_id = int(srv.response.best_grasp_id.data);
+        std::cout<<"===============The best grasp id is "<<best_id<<"===============" << std::endl;
+        best_grasp = grasp_list.grasps[best_id];
+        pub_best_grasp.publish(best_grasp);
+        pub_grasp_list.publish(grasp_list);
+        sleep(2);
+      }
+      else
+      {
+        ROS_INFO("=========== Classfication Failed or No Candidate grasps======================================");
+      }
+    }
+    else
+    {
+      std::cout<<"Robot not ready !" << std::endl;
+      sleep(2);
+    }
 
   }
 

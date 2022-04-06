@@ -16,14 +16,23 @@ conditions. To use the package, you only need PCL and Eigen (see below).
 This package is part of GPD. Please notice that **no** machine learning is included in this part. The package just 
 generates 6-DOF grasp poses for a 2-finger grasp.
 
+将`Grasp Pose Generator (GPG)`与`PointNetGPD`结合在一起，在线候选抓取采样使用GPG生成，然后使用PointNet对候选抓取进行打分排序，并执行最终排序最高的抓取。
 
-## 2) Requirements
+本仓库做了如下调整修改：
+
+1. 将原来的GPG抓取采样移植到了ROS框架中
+2. 添加了桌面的检测剔除（可选），可剔除一些与桌面发生碰撞的抓取
+3. 在`gpg_online.cpp`中以ros服务的形式调用了pointNet的打分服务，并最终把最优的抓取以话题形式发布出去
+4. 添加了以`Franka Panda`机器人为平台的简单抓取脚本，可对检测出的最优抓取进行实际执行
+
+
+## 2) 依赖
 
 1. [PCL 1.7 or later](http://pointclouds.org/)
 2. [Eigen 3.0 or later](https://eigen.tuxfamily.org)
 
 
-## 3) Compilation
+## 3) 编译
 
 1. Open a terminal and clone the *grasp_candidates_generator* repository into some folder: 
 

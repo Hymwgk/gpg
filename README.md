@@ -6,7 +6,7 @@
 
 本仓库做了如下调整修改：
 
-1. 将原来的GPG抓取采样移植到了ROS框架中
+1. 将原来的GPG抓取采样移植到了ROS框架中（已在Ubuntu18.04+ROS Melodic 平台测试）
 
 2. 添加了桌面的检测剔除（可选），可剔除一些与桌面发生碰撞的抓取
 
@@ -21,6 +21,7 @@
 
 1. [PCL 1.7 or later](http://pointclouds.org/)
 2. [Eigen 3.0 or later](https://eigen.tuxfamily.org)
+3. ROS 
 
 
 ## 3) 安装(Install)
